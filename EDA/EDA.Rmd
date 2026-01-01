@@ -1,0 +1,763 @@
+---
+title: " Rapport de stage : Analyse exploratoire des données (EDA)"
+author: "Mohamed FOFANA,    L3 MIASHS UGA"
+date: "Laboratoire AGEIS, 2025/2026"
+output: 
+  
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage 
+
+# Introduction 
+
+Cette section vise à explorer l’évolution temporelle de l’écart Femmes–Hommes en espérance de vie `(LE)` et en espérance de vie en bonne santé `(HALE)`, ainsi que les années vécues en mauvaise santé, à partir d’une analyse descriptive et graphique, complétée par une régression linéaire simple.
+
+```{r, warning=FALSE, message=FALSE}
+
+library(tidyverse)
+library(moments)
+library(psych)
+library(plm)
+library(lmtest)
+library(sandwich)
+library(FactoMineR)
+library(factoextra)
+library(readr)
+
+```
+
+#  Données et variables dérivées
+
+## Description des variables
+
+### Variables économiques et institutionnelles
+
+**PIB par habitant (`PIB_habitant`)**  
+Le PIB par habitant est une variable quantitative continue exprimée en dollars américains courants (US$).  
+Il mesure le niveau moyen de richesse économique d’un pays rapporté à sa population. Cet indicateur est couramment utilisé pour appréhender le niveau de développement économique, bien qu’il ne rende pas compte de la répartition des revenus au sein de la population.
+
+
+
+**Dépenses de santé en pourcentage du PIB (`Dep_sante_PIB`)**  
+Cette variable correspond aux dépenses courantes de santé exprimées en pourcentage du produit intérieur brut (*Current health expenditure (% of GDP)*).  
+Elle reflète l’effort global consacré à la santé dans une économie, incluant les dépenses publiques et privées. Des niveaux élevés peuvent traduire soit une priorité accordée à la santé, soit des coûts élevés du système de soins.
+
+
+**Indice de Gini (`Gini`)**  
+Le coefficient de Gini est une variable quantitative continue comprise entre 0 et 100, mesurant le degré d’inégalité dans la distribution des revenus au sein d’un pays.  
+Une valeur faible indique une répartition relativement égalitaire des revenus, tandis qu’une valeur élevée traduit de fortes inégalités économiques. Cet indicateur est fréquemment mobilisé pour analyser les liens entre inégalités socio-économiques et résultats de santé.
+
+
+**Dépenses publiques de santé (`DPGS`)**  
+La variable DPGS (*Domestic general government health expenditure (% of current health expenditure)*) mesure la part des dépenses publiques dans les dépenses courantes totales de santé.  
+Elle renseigne sur le degré d’intervention de l’État dans le financement du système de santé. Des valeurs élevées indiquent un système majoritairement financé par les pouvoirs publics, tandis que des valeurs faibles traduisent une plus forte dépendance aux dépenses privées.
+
+
+**Indice de Développement Humain (`IDH`)**  
+L’Indice de Développement Humain (IDH) est un indicateur composite compris entre 0 et 1, développé par le Programme des Nations Unies pour le Développement (PNUD).  
+Il agrège trois dimensions fondamentales du développement humain :  
+(i) la santé, mesurée par l’espérance de vie à la naissance ;  
+(ii) l’éducation, mesurée par les années moyennes de scolarisation et les années de scolarisation attendues ;  
+(iii) le niveau de vie, mesuré par le revenu national brut par habitant (en parité de pouvoir d’achat).  
+Un niveau d’IDH plus élevé reflète un meilleur niveau global de développement humain.
+
+
+### Variables sanitaires : espérance de vie et inégalités selon le sexe
+
+**Espérance de vie à la naissance (`LE_femmes`, `LE_hommes`)**  
+Ces variables quantitatives continues, exprimées en années, mesurent le nombre moyen d’années qu’un individu peut espérer vivre à la naissance, sous les conditions de mortalité observées à une période donnée, séparément pour les femmes et les hommes.
+
+
+
+**Espérance de vie en bonne santé à la naissance (`HALE_femmes`, `HALE_hommes`)**  
+Ces variables quantitatives continues, exprimées en années, mesurent le nombre moyen d’années qu’un individu peut espérer vivre en bonne santé, en tenant compte des années vécues avec des limitations fonctionnelles ou des maladies, séparément pour les femmes et les hommes.
+
+
+
+**Écart d’espérance de vie Femmes–Hommes (`LE_WMGap`)**  
+Cette variable est définie comme la différence entre l’espérance de vie des femmes et celle des hommes à la naissance :
+
+\[
+LE\_WMGap = LE_{femmes} - LE_{hommes}
+\]
+
+Un écart positif indique une espérance de vie plus élevée chez les femmes.
+
+
+
+**Écart d’espérance de vie en bonne santé Femmes–Hommes (`HALE_WMGap`)**  
+Cette variable est définie comme la différence entre l’espérance de vie en bonne santé des femmes et celle des hommes à la naissance :
+
+\[
+HALE\_WMGap = HALE_{femmes} - HALE_{hommes}
+\]
+
+Elle permet d’analyser les inégalités de santé selon le sexe en tenant compte non seulement de la durée de vie, mais aussi de sa qualité.
+
+
+
+**Années vécues en mauvaise santé**  
+Les années vécues en mauvaise santé sont calculées comme la différence entre l’espérance de vie totale et l’espérance de vie en bonne santé :
+
+\[
+\text{Années vécues en mauvaise santé} = LE - HALE
+\]
+
+Cet indicateur permet d’identifier la part de la longévité vécue avec des limitations de santé et de comparer les situations entre pays et entre sexes.
+
+
+## Importation de la Base de données 
+
+```{r, message=FALSE, results='hide'}
+# Remplace par ton chemin
+
+df <- read_delim("Data.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+head(df)
+
+```
+
+```{r, results='hide'}
+describe(df)
+```
+
+**Variables santé: gaps et  années en mauvaise santé**
+
+```{r, results='hide'}
+df <- df %>%
+mutate(
+PoorHealth_femmes = LE_femmes - HALE_femmes,
+PoorHealth_hommes = LE_hommes - HALE_hommes,
+PoorHealth_gap    = PoorHealth_femmes - PoorHealth_hommes
+)
+
+```
+
+# Analyse exploratoire des données
+
+## Histogramme 1 — Écart d’espérance de vie à la naissance (LE_WMGap)
+
+```{r}
+ggplot(df, aes(x = LE_WMGap)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "steelblue",
+    alpha = 0.6
+  ) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Distribution de l’écart d’espérance de vie à la naissance (Femmes - Hommes)",
+    x = "LE_WMGap (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+
+## Histogramme 2 — Écart d’espérance de vie en bonne santé (HALE_WMGap)
+
+
+```{r}
+ggplot(df, aes(x = HALE_WMGap)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "darkred",
+    alpha = 0.6
+  ) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Distribution de l’écart d’espérance de vie en bonne santé (Femmes - Hommes)",
+    x = "HALE_WMGap (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+## Répartition de l’espérance de vie – Femmes (LE_femmes)
+
+```{r}
+ggplot(df, aes(x = LE_femmes)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "#E41A1C", alpha = 0.7) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Répartition de l'espérance de vie – Femmes",
+    x = "Espérance de vie (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+## Répartition de l’espérance de vie – Hommes (LE_hommes)
+
+```{r}
+ggplot(df, aes(x = LE_hommes)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "#377EB8", alpha = 0.7) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Répartition de l'espérance de vie – Hommes",
+    x = "Espérance de vie (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+
+## Répartition de l’espérance de vie en bonne santé – Femmes (HALE_femmes)
+```{r}
+ggplot(df, aes(x = HALE_femmes)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "#FB8072", alpha = 0.7) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Répartition de l'espérance de vie en bonne santé – Femmes",
+    x = "HALE (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+## Répartition de l’espérance de vie en bonne santé – Hommes (HALE_hommes)
+
+
+```{r}
+ggplot(df, aes(x = HALE_hommes)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "#80B1D3", alpha = 0.7) +
+  geom_density(color = "black", linewidth = 1) +
+  labs(
+    title = "Répartition de l'espérance de vie en bonne santé – Hommes",
+    x = "HALE (années)",
+    y = "Densité"
+  ) +
+  theme_minimal()
+
+```
+
+
+## Évolution de l’écart LE Femmes−Hommes (moyenne 26 pays)
+
+```{r}
+le_gap_mean <- df %>%
+  group_by(Années) %>%
+  summarise(
+    LE_WMGap_mean = mean(LE_WMGap, na.rm = TRUE),
+    n = sum(!is.na(LE_WMGap))
+  )
+
+ggplot(le_gap_mean, aes(Années, LE_WMGap_mean)) +
+  geom_line(color = "red", linewidth = 1) +
+  geom_point(color = "red", size = 1) +
+  labs(
+    title = "Évolution de l’écart d’espérance de vie à la naissance \n(Femmes − Hommes) — Moyenne sur 26 pays",
+    x = "Années",
+    y = "LE_WMGap (années)"
+  ) +
+  theme_minimal()
+
+
+```
+
+```{r}
+pays_focus <- c("France", "Brésil", "Suède", "États-Unis")  # change si besoin
+
+df_focus <- df %>% filter(Pays %in% pays_focus)
+
+ggplot(df_focus, aes(Années, LE_WMGap, color = Pays)) +
+geom_line(linewidth = 1) +
+labs(
+title = "Évolution de l’écart LE à la naissance (Femmes − Hommes)\nFrance et 3 pays",
+x = "Année", y = "LE_WMGap", color = "Pays"
+) +
+theme_minimal()
+
+```
+
+## Évolution de l’écart HALE Femmes−Hommes (moyenne 26 pays)
+
+```{r}
+hale_gap_mean <- df %>%
+group_by(Années) %>%
+summarise(HALE_WMGap_mean = mean(HALE_WMGap, na.rm = TRUE))
+
+ggplot(hale_gap_mean, aes(Années, HALE_WMGap_mean)) +
+geom_line(color = 'blue',linewidth = 1) +
+geom_point(color= 'blue' ,size = 1) +
+labs(
+title = "Évolution de l’écart HALE à la naissance (Femmes − Hommes)\nMoyenne sur 26 pays",
+x = "Années", y = "HALE_WMGap"
+) +
+theme_minimal()
+
+```
+## Évolution des écarts moyens selon le statut
+
+```{r evolution_statut, fig.width=12, fig.height=4, echo=TRUE, message = FALSE}
+library(tidyverse)
+library(ggplot2)
+
+# --- Calcul des moyennes par année et par statut ---
+mean_gap <- df %>%
+  group_by(Années, Statut) %>%
+  summarise(
+    LE_WMGap_mean = mean(LE_WMGap, na.rm=TRUE),
+    HALE_WMGap_mean = mean(HALE_WMGap, na.rm=TRUE)
+  ) %>%
+  ungroup()
+
+# --- Graphique LE_WMGap ---
+p1 <- ggplot(mean_gap, aes(x = Années, y = LE_WMGap_mean, color = Statut)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Évolution du LE_WMGap selon le statut",
+    x = "Année",
+    y = "Valeur moyenne"
+  ) +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 10))
+
+# --- Graphique HALE_WMGap ---
+p2 <- ggplot(mean_gap, aes(x = Années, y = HALE_WMGap_mean, color = Statut)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Évolution du HALE_WMGap selon le statut",
+    x = "Année",
+    y = "Valeur moyenne"
+  ) +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 10))
+
+# --- Affichage côte à côte ---
+library(gridExtra)
+grid.arrange(p1, p2, ncol = 2)
+
+```
+
+
+
+## Esperance de vie en mauvaise santé (LE − HALE)
+
+```{r}
+
+fig4_df <- df %>%
+  # moyenne 2000–2021 par pays
+  group_by(Pays) %>%
+  summarise(
+    Femmes = mean(LE_femmes - HALE_femmes, na.rm = TRUE),
+    Hommes = mean(LE_hommes - HALE_hommes, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  # création de la variable "Sexe" (à partir des colonnes Femmes/Hommes)
+  pivot_longer(
+    cols = c(Femmes, Hommes),
+    names_to = "Sexe",
+    values_to = "Mauvaise_sante"
+  )
+
+# (option) trier les pays par la valeur Femmes
+order_pays <- fig4_df %>%
+  filter(Sexe == "Femmes") %>%
+  arrange(desc(Mauvaise_sante)) %>%
+  pull(Pays)
+
+fig4_df <- fig4_df %>%
+  mutate(Pays = factor(Pays, levels = order_pays),
+         Sexe = factor(Sexe, levels = c("Femmes", "Hommes")))
+
+ggplot(fig4_df, aes(x = Pays, y = Mauvaise_sante, fill = Sexe)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  labs(
+    title = "Esperance de vie en mauvaise santé (LE − HALE)",
+    x = "Pays",
+    y = "Années en mauvaise santé",
+    fill = "Sexe"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+```
+
+
+# Moments d’ordre et indicateurs sur la distribution des âges (population)
+
+On construit une distribution d’âge approximée par le milieu de classe et on calcule :
+
+- moyenne d’âge
+- variance
+- skewness
+- kurtosis
+
+## Mise en forme `long` des classes d’âge
+
+```{r,warning=FALSE, results='hide'}
+library(stringr)
+
+# 1) On liste uniquement les colonnes Pop_..._{femmes/hommes/filles/garçons}
+age_cols <- names(df)[str_detect(
+  names(df),
+  "^Pop_(0_4|5_9|10_14|15_19|20_24|25_29|30_34|35_39|40_44|45_49|50_54|55_59|60_64|65_69|70_74|75_79|80_plus)_(filles|garçons|femmes|hommes)$"
+)]
+
+# Vérif
+age_cols
+length(age_cols)
+
+# 2) Mapping milieux de classes
+age_mid_map <- tibble(
+  age_class = c("0_4","5_9","10_14","15_19","20_24","25_29","30_34","35_39",
+                "40_44","45_49","50_54","55_59","60_64","65_69","70_74","75_79","80_plus"),
+  age_mid = c(2,7,12,17,22,27,32,37,42,47,52,57,62,67,72,77,82.5)
+)
+
+# 3) Passage en format long
+pop_long <- df %>%
+  select(Années, Pays, all_of(age_cols)) %>%
+  pivot_longer(cols = all_of(age_cols), names_to = "var", values_to = "pop") %>%
+  mutate(
+    sexe = case_when(
+      str_detect(var, "_filles$|_femmes$")   ~ "Femmes",
+      str_detect(var, "_garçons$|_hommes$") ~ "Hommes",
+      TRUE ~ NA_character_
+    ),
+    age_class = str_match(
+      var,
+      "^Pop_(0_4|5_9|10_14|15_19|20_24|25_29|30_34|35_39|40_44|45_49|50_54|55_59|60_64|65_69|70_74|75_79|80_plus)_(filles|garçons|femmes|hommes)$"
+    )[,2]
+  ) %>%
+  left_join(age_mid_map, by = "age_class") %>%
+  filter(!is.na(sexe), !is.na(age_mid), !is.na(pop))
+
+pop_long %>% slice(1:10)
+
+
+```
+## Fonctions de moments pondérés
+
+```{r, results='hide'}
+weighted_moments <- function(x, w){
+w <- w / sum(w)
+mu <- sum(w * x)
+v  <- sum(w * (x - mu)^2)
+sk <- sum(w * (x - mu)^3) / (v^(3/2) + 1e-12)
+ku <- sum(w * (x - mu)^4) / (v^2 + 1e-12)
+tibble(mean_age = mu, var_age = v, skew_age = sk, kurt_age = ku)
+}
+
+```
+
+## Calcul des moments (`Pays`, `Année`, `Sexe`)
+
+```{r, results='hide'}
+mom <- pop_long %>%
+group_by(Pays, Années, sexe) %>%
+summarise(out = list(weighted_moments(age_mid, pop)), .groups = "drop") %>%
+unnest(out)
+
+glimpse(mom)
+
+```
+
+## Évolution moyenne (26 pays) des moments (`variance`, `skewness`, `kurtosis`)
+
+```{r}
+mom_mean <- mom %>%
+group_by(Années, sexe) %>%
+summarise(
+mean_age = mean(mean_age, na.rm=TRUE),
+var_age  = mean(var_age, na.rm=TRUE),
+skew_age = mean(skew_age, na.rm=TRUE),
+kurt_age = mean(kurt_age, na.rm=TRUE),
+.groups = "drop"
+)
+
+plot_moment <- function(data, y, titre, ylab){
+ggplot(data, aes(Années, .data[[y]], color = sexe)) +
+geom_line(linewidth=1) +
+labs(title=titre, x="Année", y=ylab, color="Sexe") +
+theme_minimal()
+}
+
+plot_moment(mom_mean, "var_age",  "Variance de la distribution d’âge (moyenne 26 pays)", "Variance")
+plot_moment(mom_mean, "skew_age", "Skewness de la distribution d’âge (moyenne 26 pays)", "Skewness")
+plot_moment(mom_mean, "kurt_age", "Kurtosis de la distribution d’âge (moyenne 26 pays)", "Kurtosis")
+
+```
+
+# Régressions linéaires simples (LE)
+
+## LE_WMGap ~ Gini
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(LE_WMGap), !is.na(Gini))
+
+m1 <- lm(LE_WMGap ~ Gini, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(Gini, LE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: LE_WMGap ~ Gini",
+x = "Gini", y = "LE_WMGap"
+) +
+theme_minimal()
+
+```
+
+## LE_WMGap ~ PIB
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(LE_WMGap), !is.na(Gini))
+
+m1 <- lm(LE_WMGap ~ PIB_habitant, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(PIB_habitant, LE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: LE_WMGap ~ PIB_habitant",
+x = "PIB_habitant", y = "LE_WMGap"
+) +
+theme_minimal()
+
+```
+
+
+## LE_WMGap ~ IDH
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(LE_WMGap), !is.na(Gini))
+
+m1 <- lm(LE_WMGap ~ IDH, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(IDH, LE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: LE_WMGap ~ IDH",
+x = "IDH", y = "LE_WMGap"
+) +
+theme_minimal()
+```
+
+## LE_WMGap ~ DPGS
+
+### Modèles Linéaire 
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(LE_WMGap), !is.na(Gini))
+
+m1 <- lm(LE_WMGap ~ DPGS, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(DPGS, LE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: LE_WMGap ~ DPGS",
+x = "DPGS", y = "LE_WMGap"
+) +
+theme_minimal()
+```
+
+### Courbe spline
+
+```{r,  message=FALSE}
+ggplot(reg1, aes(x = DPGS, y = LE_WMGap)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ splines::ns(x, df = 4),
+    se = TRUE,
+    size = 1
+  ) +
+  labs(
+    title = "Relation non linéaire (spline) : LE_WMGap ~ DPGS",
+    x = "DPGS",
+    y = "LE_WMGap (années)"
+  ) +
+  theme_minimal()
+
+
+```
+
+
+### ANOVA (comparaison: linéaire vs spline)
+
+
+```{r}
+library(splines)
+
+m1_lm <- lm(LE_WMGap ~ DPGS, data = reg1)
+
+m1_spline <- lm(LE_WMGap ~ ns(DPGS, df = 4), data = reg1)
+
+anova(m1_lm, m1_spline)
+
+```
+
+Afin de tester l’hypothèse de linéarité entre la part des dépenses publiques de santé (DPGS) et l’écart d’espérance de vie Femmes–Hommes à la naissance (LE_WMGap), un modèle linéaire a été comparé à un modèle spline cubique naturelle.
+Le test de comparaison des modèles (ANOVA) montre que le modèle spline améliore très significativement l’ajustement par rapport au modèle linéaire (F = 83.3, p < 2.2×10⁻¹⁶).
+Ce résultat met en évidence une relation non linéaire entre DPGS et LE_WMGap, indiquant que l’effet des dépenses publiques de santé sur l’écart d’espérance de vie varie selon leur niveau.
+Cette analyse exploratoire justifie l’utilisation de spécifications non linéaires dans les analyses économétriques ultérieures.
+
+# Régressions linéaires simples (HALE)
+
+## HALE_WMGap ~ Gini
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(HALE_WMGap), !is.na(Gini))
+
+m1 <- lm(HALE_WMGap ~ Gini, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(Gini, LE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: HALE_WMGap ~ Gini",
+x = "Gini", y = "HALE_WMGap"
+) +
+theme_minimal()
+
+```
+
+## HALE_WMGap ~ PIB
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(HALE_WMGap), !is.na(Gini))
+
+m1 <- lm(HALE_WMGap ~ PIB_habitant, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(PIB_habitant, HALE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: HALE_WMGap ~ PIB_habitant",
+x = "PIB_habitant", y = "HALE_WMGap"
+) +
+theme_minimal()
+
+```
+
+## HALE_WMGap ~ IDH
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(HALE_WMGap), !is.na(Gini))
+
+m1 <- lm(HALE_WMGap ~ IDH, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(IDH, HALE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: HALE_WMGap ~ IDH",
+x = "IDH", y = "HALE_WMGap"
+) +
+theme_minimal()
+```
+
+
+## HALE_WMGap ~ DPGS
+### Modèles Linéaire 
+
+
+```{r,  message=FALSE}
+reg1 <- df %>%
+filter(!is.na(HALE_WMGap), !is.na(Gini))
+
+m1 <- lm(HALE_WMGap ~ DPGS, data = reg1)
+summary(m1)
+
+ggplot(reg1, aes(DPGS, HALE_WMGap)) +
+geom_point(alpha = 0.6) +
+geom_smooth(method = "lm", se = TRUE) +
+labs(
+title = "Régression simple: HALE_WMGap ~ DPGS",
+x = "DPGS", y = "HALE_WMGap"
+) +
+theme_minimal()
+```
+
+
+
+
+### Courbe spline
+
+
+
+```{r}
+ggplot(reg1, aes(x = DPGS, y = HALE_WMGap)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ splines::ns(x, df = 4),
+    se = TRUE,
+    size = 1
+  ) +
+  labs(
+    title = "Relation non linéaire (spline) : HALE_WMGap ~ DPGS",
+    x = "DPGS",
+    y = "HALE_WMGap (années)"
+  ) +
+  theme_minimal()
+
+
+```
+
+### ANOVA (comparaison: linéaire vs spline)
+
+```{r}
+library(splines)
+
+m2_lm <- lm(HALE_WMGap ~ DPGS, data = reg1)
+
+m2_spline <- lm(HALE_WMGap ~ ns(DPGS, df = 4), data = reg1)
+
+anova(m2_lm, m2_spline)
+
+```
+
+
+Le test de comparaison entre un modèle linéaire et un modèle spline cubique naturelle met en évidence une amélioration très significative de l’ajustement lorsque la non-linéarité est prise en compte (F = 50.46, p < 2.2×10⁻¹⁶).
+Ce résultat indique que la relation entre la part des dépenses publiques de santé (DPGS) et l’écart d’espérance de vie en bonne santé entre femmes et hommes (HALE_WMGap) est fondamentalement non linéaire.
+Ainsi, l’impact des dépenses publiques de santé sur les inégalités de santé selon le sexe varie avec leur niveau, ce qui justifie l’utilisation de modèles flexibles dans les analyses ultérieures.
+
+
+## Conclusion 
+
+Bien que les deux écarts (`LE_WMGap` et `HALE_WMGap`) présentent une relation non linéaire avec `DPGS`, l’intensité de la non-linéarité apparaît plus marquée pour l’écart d’espérance de vie totale que pour l’écart d’espérance de vie en bonne santé, suggérant des mécanismes différenciés selon la dimension de santé considérée.
+
+

@@ -1,0 +1,725 @@
+---
+title: ' Rapport de Stage : Analyse et Regression'
+author: "Mohamed FOFANA,     L3 MIASHS UGA"
+date: "Laboratoire AGEIS, 2025/2026"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  word_document:
+    toc: true
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\vspace{4cm} 
+
+# Introduction
+
+L’objectif de cette étude est d’examiner les déterminants sanitaires, économiques et démographiques expliquant l’écart d’espérance de vie brute entre les femmes et les hommes (LE_WMGap) et l'écart d'espérance de vie en bonne santé entre les femmes et les hommes (HALE\_WMGap) dans un ensemble de 26 pays, observés de 2000 à 2021.
+
+Les données comprennent :  
+- des indicateurs socio-économiques (PIB, Gini, dépenses de santé, DPGS),  
+- la prévalence de maladies infectieuses (VIH/SIDA),  
+- l’incidence de plusieurs types de cancers,  
+
+
+L’approche méthodologique repose sur trois niveaux d’analyse :  
+1. **Régressions simples** pour explorer les relations bivariées.  
+2. **Régressions multiples par la méthode ordinaire des moindres carrés** afin d’identifier les déterminants indépendants du LE_WMGap et du HALE\_WMGap.   
+3. **Modèles de panel (effets fixes, effets aléatoires)** pour tenir compte de la structure pays–temps et corriger les biais potentiels liés à l’hétérogénéité non observée.
+
+Des diagnostics de modèles (White, Wooldridge, Hausman) et des corrections robustes sont également réalisés afin d’assurer la validité statistique des estimations.
+
+# Description des variables utilisées dans les modèles
+
+L’analyse s’appuie sur un ensemble de variables économiques, sanitaires, démographiques et structurelles mesurées annuellement pour 26 pays entre 2000 et 2021.  
+Les principales variables retenues pour la régression multiple et les modèles de panel sont décrites ci-dessous.
+
+## Variable dépendante
+- **LE_WMGap** : différence d’espérance de vie entre les femmes et les hommes  
+  \[
+  LE\_WMGap = LE\_{femmes} - LE\_{hommes}
+  \]
+  
+  LE( pour Life expectancy)
+  
+  Un LE_WMGap positif signifie que les femmes vivent plus longtemps que les hommes.
+
+## Variables explicatives économiques
+- **log_PIB** : logarithme du PIB par habitant (dollars internationaux).  
+  Le logarithme permet de réduire l’asymétrie et de modéliser des effets proportionnels.
+  
+- **log_Gini** : logarithme de l’indice de Gini, mesurant les inégalités internes d’un pays.  
+  PLUS Gini est élevé → PLUS les inégalités économiques sont fortes.
+
+## Variables explicatives liées au système de santé
+- **Dep_sante_PIB** : Dépenses totales de santé exprimées en pourcentage du PIB.  
+  Reflète l’effort sanitaire global d’un pays.
+
+- **DPGS (Domestic General Government Health Expenditure)** :  
+  Part des dépenses publiques de santé financée par le **gouvernement**, exprimée en pourcentage de la dépense courante de santé.  
+  \[
+  DPGS = \frac{\text{Dépenses gouvernementales de santé}}{\text{Dépenses totales de santé}}
+  \]
+  Cette variable indique la contribution de l'État dans le financement de la santé.  
+  Une valeur élevée signifie un système de santé très public.
+
+## Variables sanitaires 
+Toutes ces variables représentent l’incidence (cas pour 100 000 habitants) des maladies suivantes :
+
+- **Cancer_thyroïde** : Cancer thyroïde
+- **Cancer_Estomac**  : Cancer de l'estomac
+- **Cancer_Utérus**   : Cancer de l'utérus
+- **Cancer_Foie**     : Cancer du foie
+- **Cancer_Sein**     : Cancer du sein chez les  femmes
+- **Cancer_Testicule**: Cancer du testicule chez les hommes
+- **VIH_SIDA** : prévalence du VIH/SIDA pour 100 000 habitants.  
+Les cancers ci-dessous et les VIH ont été choisis car ils présentent des différences marquées entre hommes et femmes et influencent les décès évitables.
+
+## Liste des pays concernés 
+
+**a) Pays developpés** 
+
+- **Allemagne** 
+- **Canada** 
+- **\textcolor{red}{Chili}** 
+- **Chine** 
+- **\textcolor{red}{Corée du Sud}**
+- **États-Unis**
+- **\textcolor{red}{Espagne}**
+- **France**
+- **Japon**
+- **\textcolor{red}{Royaume-Uni}**
+- **Russie**
+- **Suisse**
+- **Suède**
+
+**b) Pays en developpement**
+
+- **Afrique du Sud**
+- **Brésil**
+- **\textcolor{red}{Côte d'Ivoire}**
+- **Inde**
+- **\textcolor{red}{Indonésie}**
+- **Iran**
+- **Mexique**
+- **Maroc**
+- **Nigeria**
+- **\textcolor{red}{Pérou}**
+- **\textcolor{red}{Sénégal}**
+- **Togo**
+- **Turquie**
+
+## Chargement des librairies 
+
+```{r, results='hide',message=FALSE, warning=FALSE}
+
+library(moments)
+library(tidyverse)
+library(moments)
+library(psych)
+library(plm)
+library(lmtest)
+library(sandwich)
+library(FactoMineR)
+library(factoextra)
+library(readr)
+Data <- read_delim("/Users/fofanamohamed/Desktop/Stage/DatasansHALE.csv",  
+                   delim = ";", escape_double = FALSE, trim_ws = TRUE)
+```
+
+```{r, results='hide'}
+head(Data)
+```
+
+
+```{r, results='hide'}
+# Création dela colonne LE_WMGap
+Data <- Data %>%
+  mutate(
+    LE_WMGap_calc  = LE_femmes - LE_hommes,
+    LE_WMGap60_calc = LE_60_femmes - LE_60_hommes
+  )
+
+Data <- Data %>%
+  rename(DPGS = `DPGS(%DCS)`)
+
+Data <- Data %>%
+  rename(VIH_SIDA = `VIH/SIDA`)
+names(Data)
+```
+
+## Régressions simples (LE_WMGap)
+
+
+```{r, message=FALSE}
+# Packages nécessaires
+library(stargazer)
+library(broom)
+library(dplyr)
+library(patchwork)
+
+# Convertir Statut en facteur
+
+Data$Statut <- as.factor(Data$Statut)
+
+# Définir les modèles
+
+models <- list(
+PIB = lm(scale(LE_WMGap) ~ scale(PIB_habitant), data = Data),
+Gini = lm(scale(LE_WMGap) ~ scale(Gini), data = Data),
+VIH = lm(scale(LE_WMGap) ~ scale(VIH_SIDA), data = Data),
+Cancer = lm(scale(LE_WMGap) ~ scale(Cancer_Sein), data = Data)
+)
+
+# Tableau résumé avec stargazer
+
+stargazer(models$PIB, models$Gini, models$VIH, models$Cancer,
+type = "text",
+title = "Régressions simples sur LE_WMGap",
+dep.var.labels = "LE_WMGap",
+digits = 2)
+
+```
+
+a) Concept
+
+Les régressions simples permettent d’évaluer la relation entre LE_WMGap et chaque variable explicative prise séparément.
+
+b) Résultats
+
+- **PIB par habitant** : relation positive mais faible, suggérant qu’un niveau économique élevé tend à accroître légèrement l’avantage féminin.
+- **Indice de Gini** : relation positive marginalement significative, indiquant que les inégalités internes d'un pays pourraient contribuer à élargir le LE_gap.
+- **VIH/SIDA** : relation fortement négative ; une prévalence élevée du VIH augmente la mortalité générale et réduit l’écart femmes–hommes. Les femmes sont plus nombreuses à souffrire du SIDA (59%) , mais en meurent moins (47%), car elles sont mieux suivies. L'effet négatif est dû au fait qu'elles sont infectées plus jeunes. [cf. https://WWW.ined.fr/fr/actualites/presse/sida-et-ecarts-esperance-de-vie-entre-hommes-et-femmes-en-afrique/](https://WWW.ined.fr/fr/actualites/presse/sida-et-ecarts-esperance-de-vie-entre-hommes-et-femmes-en-afrique/)
+- **Cancer du sein** : relation positive et très significative.
+
+Ces résultats montrent que certaines variables sanitaires jouent un rôle déterminant, tandis que les variables économiques seules n’expliquent pas entièrement les variations du LE_WMGap.
+
+\vspace{2cm}
+
+## Régression multiple (LE_WMGap)
+
+```{r, message=FALSE}
+library(car)
+```
+
+
+```{r, echo=FALSE}
+# Prenonons le log du PIB et Gini
+Data$log_PIB <- log(Data$PIB_habitant)
+Data$log_Gini <- log(Data$Gini)
+
+mod_multi <- lm(
+  LE_WMGap ~ log_PIB + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+  Cancer_Foie + Cancer_Sein + Cancer_Testicule +
+    VIH_SIDA,
+  data = Data
+)
+
+summary(mod_multi)
+vif(mod_multi)
+```
+
+Le modèle multiple inclut simultanément les variables économiques, sanitaires et structurelles.  
+Le modèle explique **environ 71 % de la variance** de LE_WMGap, ce qui est un niveau très élevé.
+
+**Principaux enseignements :**
+
+ a)  Rôle des inégalités économiques (log_Gini)
+ 
+Le log du Gini exerce un effet positif et fortement significatif, indiquant qu’une augmentation des inégalités internes du pays est associée à un accroissement de l’écart d’espérance de vie entre hommes et femmes.
+
+ b)  Structure du financement de la santé
+ 
+- **Dep_sante_PIB (dépense totale)** → coefficient négatif :  
+  suggère que l’augmentation globale des dépenses de santé bénéficie légèrement plus aux hommes, réduisant ainsi le LE_gap.
+  
+- **DPGS (financement public)** → coefficient positif :  
+  un financement gouvernemental plus important semble au contraire accroître le LE_WMGap, probablement en raison d’un accès accru des femmes à la prévention et au dépistage.
+
+Ces deux variables décrivent des effets complémentaires de la structure sanitaire d’un pays.
+
+ c) Importance des cancers
+ 
+Plusieurs cancers ont un impact majeur sur le LE_WMGap :
+- **thyroïde, estomac, utérus** : coefficients très significatifs  
+- **testicule** : effet fortement positif  
+- **sein et foie** : effets plus faibles dans ce modèle complet
+
+Ces résultats montrent que la transition épidémiologique, et en particulier les maladies non transmissibles, influencent les différences de longévité entre sexes.
+
+- VIH/SIDA
+
+Un niveau élevé de VIH réduit significativement le LE_gap en raison d’une surmortalité masculine marquée.
+
+- Validité du modèle
+
+Les FIV (Facteurs d'inflation de la variance, outils statistique qui mesurent la multicolinearité, c'est à dire la corrélation entre les variables prédictives) restent inférieurs à 7 pour toutes les variables, indiquant une absence de multicolinéarité problématique.
+
+
+# Modèle de panel ANOVA (LE_WMGap)
+```{r}
+library(dplyr)
+library(plm)
+
+Data_panel <- pdata.frame(Data, index = c("Pays", "Années"))
+```
+
+## Modèle à effets fixes
+
+```{r, echo=FALSE}
+mod_EFixe <- plm(
+  LE_WMGap ~ log_PIB + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel,
+  model = "within"     # effets fixes 
+)
+
+summary(mod_EFixe)
+```
+
+**a) Concept**
+
+Le modèle à effets fixes (FE) élimine toutes les caractéristiques propres à chaque pays et stables dans le temps (organisation du système de santé, structure socio-économique durable, habitudes de vie, etc.).
+
+**b) Résultats** 
+
+- Les variables **qui varient fortement dans le temps** (cancers, dépenses de santé, VIH) sont les déterminants majeurs du LE_WMGap.
+- Les variables économiques (log_PIB et log_Gini) deviennent moins significatives, ce qui est attendu dans un modèle FE où la variabilité entre pays est absorbée par les effets fixes.
+
+Le modèle FE explique **environ 60 % de la variance intra-pays**.
+
+
+## Modèle à effets aléatoires
+```{r, echo=FALSE}
+mod_EAl <- plm(
+  LE_WMGap ~ log_PIB + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel,
+  model = "random"     # effets Aléatoire
+)
+
+summary(mod_EAl)
+
+```
+## Test de Hausman. 
+
+```{r}
+hausman <- phtest(mod_EFixe, mod_EAl)
+hausman
+
+```
+
+a) Effets aléatoires et test de Hausman
+
+Le modèle à effets aléatoires repose sur l’hypothèse que les effets spécifiques aux pays ne sont pas corrélés avec les variables explicatives.
+
+Afin de déterminer quel modèle (FE ou RE) est approprié, nous utilisons le test de Hausman :
+
+- Une **p-value très faible** indique que les effets individuels sont corrélés aux variables explicatives.
+- Dans ce cas, le modèle **à effets fixes est préférable**, car il fournit des estimations non biaisées.
+
+b) Conclusion :  
+ Le modèle à **effets fixes** est retenu comme modèle final pour l’analyse du LE_WMGap.
+
+
+# Modèle de panel ANOVA (HALE_WMGap)
+## Importation de ma base de données 
+
+```{r, message=FALSE, results='hide'}
+Data1 <- read_csv("/Users/fofanamohamed/Desktop/Stage/HALE_Data1.csv")
+head(Data1)
+```
+
+### Fusion des bases de données 
+
+```{r, results='hide'}
+Datafusion <- Data1 %>% left_join(Data, by = c("Pays", "Années"))
+head(Datafusion)
+```
+
+### Sauvegarde de la nouvelle base de données 
+
+```{r}
+write.csv(Datafusion, "DataFusion.csv", row.names = FALSE)
+
+```
+```{r}
+Data_panel1 <- pdata.frame(Datafusion, index = c("Pays","Années"))
+```
+
+## Modèle à effets fixes
+```{r, echo=FALSE}
+mod_EFixe2 <- plm(
+  HALE_WMGap ~ log_PIB + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel1,
+  model = "within"     # effets fixes 
+)
+
+summary(mod_EFixe2)
+```
+
+
+## Modèle à effets aléatoires
+
+```{r, echo=FALSE}
+mod_EAl2 <- plm(
+  HALE_WMGap ~ log_PIB + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel1,
+  model = "random"     # effets Aléatoire
+)
+
+summary(mod_EAl2)
+```
+
+## Test de Hausman
+
+```{r}
+hausman2 <- phtest(mod_EFixe2, mod_EAl2)
+hausman2
+```
+
+
+#  Interprétation du modèle de panel ANOVA (HALE_WMGap)
+
+L’indicateur HALE_WMGap mesure l’écart entre les femmes et les hommes en termes 
+d’espérance de vie en bonne santé (Healthy Life Expectancy).  
+Il s’agit d’une mesure essentielle, car elle reflète non seulement la durée de vie, mais aussi la qualité des années vécues.
+
+- **Concept**
+
+Alors que LE_WMGap mesure l’écart d’espérance de vie brute,  
+**HALE_WMGap se concentre sur les années vécues sans limitations majeures de santé**.  
+Un HALE_WMGap positif signifie que les femmes vivent plus longtemps en bonne santé que les hommes.
+
+L’analyse de HALE permet de vérifier si les déterminants du LE_WMGap agissent de manière similaire sur la qualité de vie, ou si certains facteurs influencent différemment les années vécues en bonne santé.
+
+## Modèle à effets fixes : interprétation
+
+Le modèle à effets fixes (FE) élimine toutes les caractéristiques propres aux pays, constantes dans le temps 
+(système de santé, culture sanitaire, habitudes de vie, facteurs sociaux structurels).
+
+a) Résultats principaux (effets fixes)
+
+Les coefficients montrent que plusieurs variables évoluant dans le temps contribuent fortement à la variation du HALE_WMGap :
+
+- **Cancers à forte incidence féminine (thyroïde, utérus)**  
+  → coefficients négatifs et très significatifs  
+  → diminuent le HALE des femmes, ce qui réduit l’écart avec les hommes.
+
+- **Cancers masculins (testicule)**  
+  → coefficient fortement positif  
+  → augmente le HALE_WMGap car il affecte plus gravement les hommes.
+
+- **Cancer de l’estomac**  
+  → effet positif important, cohérent avec sa surmortalité masculine.
+
+- **VIH/SIDA**  
+  → effet négatif très significatif : la prévalence élevée du VIH chez les femmes jeunes réduit fortement le HALE féminin, diminuant l’écart.
+
+- **log_Gini** → effet positif marginal  
+  Les inégalités internes d'un pays semblent toujours jouer un rôle, mais de manière plus faible que dans LE_WMGap 
+  une fois contrôlées les spécificités pays.
+
+- **Dep_sante_PIB**  
+  Non significatif dans le modèle FE, suggérant que les variations intra-pays de la dépense totale de santé n’expliquent pas les variations du HALE gap.
+
+- **DPGS**  
+  Effet marginalement positif : un financement public plus important peut favoriser un meilleur accès aux soins préventifs pour les femmes.
+
+b) Qualité du modèle  
+Le modèle FE explique environ **59 % de la variance intra-pays**, ce qui est très robuste pour un panel longitudinal.
+
+## Modèle à effets aléatoires : interprétation
+
+Le modèle RE suppose que les différences entre pays ne sont pas corrélées aux variables explicatives.
+
+- **Principaux enseignements**
+
+- Les coefficients restent proches de ceux du FE pour la plupart des variables sanitaires (cancers, VIH).
+- Certaines variables économiques semblent plus influentes que dans le FE, ce qui est logique puisque RE exploite la variabilité **entre** pays.
+
+**Cependant :**
+
+- log_PIB reste non significatif  
+- log_Gini devient légèrement plus significatif ($p \approx 0.07$)
+
+Le RE présente une structure cohérente mais repose sur une hypothèse restrictive 
+(absence de corrélation entre erreurs et covariables).
+
+
+## Test de Hausman : conclusion
+
+Le test de Hausman compare les modèles FE et RE :  chisq = 101.72, \text{df} = 11, p-value < 2.2e-16
+
+
+### Interprétation :
+
+- La p-value est extrêmement faible.  
+- Les estimateurs RE sont donc **inconsistants**.  
+- Le modèle à **effets fixes (FE)** doit être privilégié.
+
+### Conclusion :
+
+ **Le modèle final pour HALE_WMGap est le modèle à effets fixes.**  
+ Les déterminants sanitaires (cancers, VIH) jouent un rôle central.  
+ Les variables économiques jouent un rôle secondaire une fois contrôlées les spécificités propres aux pays.
+
+
+### Synthèse comparative LE_WMGap vs HALE_WMGap
+
+1. **Même structure globale des déterminants**  
+   → cancers, VIH et financement public de la santé influencent les deux indicateurs.
+
+2. **Les cancers ont un rôle encore plus clair dans HALE_WMGap**  
+   car ils affectent directement la qualité de vie, pas seulement la survie.
+
+3. **Le VIH réduit fortement les deux gaps**, mais l’effet est encore plus net dans HALE, 
+   ce qui est cohérent avec les limitations de santé associées à la maladie.
+
+4. **Les inégalités (log_Gini)** influencent principalement LE_WMGap,  
+   tandis qu’elles deviennent secondaires pour HALE une fois les effets pays retirés.
+
+5. **Le modèle FE est le plus adapté pour les deux indicateurs**, 
+   confirmant que les effets spécifiques propres aux pays influencent les résultats.
+
+
+## Conclusion générale modèle de panel ANOVA (HALE_WMGap)
+
+L’analyse du HALE_WMGap met en évidence que :
+
+- les maladies chroniques (en particulier les cancers) sont les déterminants les plus puissants 
+  de l’écart d’espérance de vie en bonne santé ;
+- les maladies infectieuses comme le VIH expliquent une part importante des différences entre sexes ;
+- la structure du financement public de la santé joue un rôle, bien que plus modéré ;
+- les inégalités économiques affectent moins HALE que LE ;
+- le modèle à effets fixes capture correctement les variations intra-pays et doit être retenu
+  comme modèle final.
+
+Ces résultats complètent l’analyse du LE_WMGap et permettent une compréhension plus fine de 
+la dynamique santé-femmes-hommes dans les pays étudiés.
+
+
+\newpage
+
+# Ajout de la Variable HDI 
+
+## Description de la variable 
+
+
+
+**\textcolor{red}{L'indice de développement humain ou IDH}** est un indice statistique composite visant à évaluer le taux de développement humain des pays du monde. L'IDH se fondait initialement sur trois critères : le PIB par habitant, l'espérance de vie à la naissance et le niveau d'éducation des enfants de 17 ans et plus.
+
+Le concept du développement humain est plus large que ce qu'en décrit l'IDH. Ce n'en est qu'un indicateur, créé par le PNUD en 1990 pour évaluer ce qui n'était mesuré auparavant qu'avec imprécision. L'indicateur précédemment utilisé, le PIB par habitant, ne donne pas d'information sur le bien-être individuel ou collectif, mais n'évalue que la production économique. Il présente des écarts qui peuvent être très importants avec l'IDH. L'IDH a été créé à l'origine par l'économiste indien Amartya Sen et l'économiste pakistanais Mahbub ul Haq. Pour Sen comme pour le PNUD, le développement est plutôt, en dernière analyse, un processus d'élargissement du choix des gens qu'une simple augmentation du revenu national. Notons enfin qu'il existe un indice dérivé de l'IDH, le GDI (Gender-related Development Index), qui prend en compte les disparités liées au sexe, soit les différences de situation de vie entre les hommes et les femmes d'un pays considéré.
+
+## Importation de la Base de données 
+
+```{r, message=FALSE}
+Data2 <- read_delim("/Users/fofanamohamed/Desktop/Stage/DataIDH.csv", delim = ";")
+
+# Fusion des bases de données
+Dataglobal <- Datafusion %>% left_join(Data2, by = c("Pays", "Années"))
+
+# Sauvegarder la Nouvelle base de données
+write.csv(Dataglobal, "Dataglobal.csv", row.names = FALSE)
+
+head(Dataglobal)
+```
+
+## Regression multiple (LE_WMGap)
+
+```{r, echo=FALSE}
+Dataglobal$log_Gini <- log(Data$Gini)
+
+mod_multi1 <- lm(
+  LE_WMGap ~ IDH + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+  Cancer_Foie + Cancer_Sein + Cancer_Testicule +
+    VIH_SIDA,
+  data = Dataglobal
+)
+
+summary(mod_multi1)
+vif(mod_multi1)
+
+```
+
+## Modèle de panel ANOVA (LE_WMGap)
+```{r, results='hide'}
+library(dplyr)
+library(plm)
+Data_panel2 <- pdata.frame(Dataglobal, index = c("Pays", "Années"))
+```
+
+### Modèle à effet fixes 
+
+```{r, echo=FALSE}
+mod_EFixe3 <- plm(
+  LE_WMGap ~ IDH + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel2,
+  model = "within"     # effets fixes 
+)
+
+summary(mod_EFixe3)
+```
+
+### Modèle à effet aléatoire 
+```{r, echo=FALSE}
+mod_EAl3 <- plm(
+  LE_WMGap ~ IDH + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel2,
+  model = "random"     # effets Aléatoire
+)
+
+summary(mod_EAl3)
+```
+
+### Test Hausman
+```{r, echo=FALSE}
+hausman3 <- phtest(mod_EFixe3, mod_EAl3)
+hausman3
+```
+## Tests diagnostiques
+
+### Test de Wooldridge (autocorrélation)
+
+```{r}
+library(lmtest)
+
+pwartest(mod_EFixe3)
+
+```
+
+### Hétéroscédasticité (Breusch–Pagan)
+
+```{r}
+bptest(mod_EFixe3, studentize = TRUE)
+```
+
+### Erreurs standards robustes
+
+```{r}
+library(lmtest)
+library(sandwich)
+
+coeftest(
+  mod_EFixe3,
+  vcov = vcovHC(mod_EFixe3, type = "HC1", cluster = "group")
+)
+
+```
+
+## Modèle de pannel ANOVA (HALE_WMGap)
+
+### Modèles à effet fixes 
+```{r, echo=FALSE}
+mod_EFixe4 <- plm(
+  HALE_WMGap ~ IDH + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel2,
+  model = "within"     # effets fixes 
+)
+
+summary(mod_EFixe4)
+```
+
+
+### Modèles à effet aléatoire 
+
+```{r, echo=FALSE}
+mod_EAl4 <- plm(
+  HALE_WMGap ~ IDH + log_Gini + Dep_sante_PIB + DPGS +
+    Cancer_thyroïde + Cancer_Estomac + Cancer_Utérus +
+    Cancer_Foie + Cancer_Sein + Cancer_Testicule + VIH_SIDA,
+  data = Data_panel2,
+  model = "random"     # effets Aléatoire
+)
+
+summary(mod_EAl4)
+```
+### Test Hausman 
+
+```{r, echo=FALSE}
+hausman4 <- phtest(mod_EFixe4, mod_EAl4)
+hausman4
+```
+
+## Tests diagnostiques
+
+### Test de Wooldridge (autocorrélation)
+
+```{r, echo=FALSE}
+library(lmtest)
+
+pwartest(mod_EFixe4)
+
+```
+### Hétéroscédasticité (Breusch–Pagan)
+
+```{r, echo=FALSE}
+bptest(mod_EFixe4, studentize = TRUE)
+```
+
+### Erreurs standards robustes
+
+```{r}
+library(lmtest)
+library(sandwich)
+
+coeftest(
+  mod_EFixe4,
+  vcov = vcovHC(mod_EFixe4, type = "HC1", cluster = "group")
+)
+
+```
+
+
+## Interprétation et résultats des tests diagnostiques
+
+Les analyses économétriques menées sur les deux variables dépendantes — l’écart d’espérance de vie (LE_WMGap) et l’écart d’espérance de vie en bonne santé (HALE_WMGap) — ont été complétées par une batterie de tests diagnostiques afin de vérifier la validité des hypothèses sous-jacentes aux modèles estimés.
+Tout d’abord, le test de Wooldridge met en évidence la présence d’une autocorrélation sérielle significative des résidus dans les modèles de panel à effets fixes, tant pour LE_WMGap que pour HALE_WMGap. Cette autocorrélation indique une dépendance temporelle des erreurs au sein de chaque pays, ce qui viole l’hypothèse d’indépendance des résidus.
+
+
+Par ailleurs, les tests d’hétéroscédasticité de Breusch–Pagan (et White) révèlent une variance non constante des erreurs, suggérant que la dispersion des résidus varie selon les observations. Cette violation supplémentaire remet en cause l’hypothèse d’homoscédasticité des erreurs.
+
+Face à ces constats, des erreurs standards robustes, clusterisées au niveau des pays, ont été estimées afin de corriger simultanément l’autocorrélation intra-groupe et l’hétéroscédasticité.
+Après correction, les résultats montrent que :
+
+- Plusieurs variables explicatives perdent leur significativité statistique, indiquant que leurs effets étaient surestimés dans les estimations non robustes ;
+
+- Certaines variables demeurent statistiquement significatives et robustes, notamment les indicateurs liés à la mortalité par VIH/SIDA, cancer du testicule et cancer de l’utérus, suggérant des relations structurelles plus stables avec les écarts d’espérance de vie entre femmes et hommes.
+
+## Conclusion méthodologique
+
+Ces résultats conduisent à une conclusion méthodologique claire :
+les hypothèses classiques des moindres carrés ordinaires ne sont pas respectées dans le cadre de ces données de panel, ce qui invalide une interprétation naïve des tests de significativité standards.
+Toutefois, ces violations n’invalident pas les modèles eux-mêmes, mais affectent la précision statistique de certaines estimations. Les coefficients conservent globalement leur signe et leur ordre de grandeur, ce qui permet une interprétation prudente des relations observées, en termes d’associations structurelles plutôt que de causalité stricte.
+
+# Conclusion générale
+
+Cette étude analyse les déterminants des écarts d’espérance de vie (LE) et d’espérance de vie en bonne santé (HALE) entre femmes et hommes dans un panel de 26 pays observés sur une période de 22 années. Les résultats issus des régressions multiples et des modèles de panel mettent en évidence le rôle central de facteurs socio-économiques, sanitaires et épidémiologiques dans la structuration de ces écarts.
+
+Les estimations montrent que les inégalités de revenus, les dépenses de santé — en particulier la part des dépenses publiques de santé (DPGS) — ainsi que certaines causes spécifiques de mortalité différenciées selon le sexe, contribuent significativement aux écarts observés. Les résultats sont globalement cohérents entre les modèles portant sur LE_WMGap et HALE_WMGap, soulignant la robustesse qualitative des mécanismes sous-jacents.
+
+Néanmoins, la présence d’autocorrélation et d’hétéroscédasticité appelle à une interprétation prudente des niveaux de significativité. L’utilisation d’erreurs standards robustes permet de renforcer la fiabilité des inférences, tout en montrant que seuls certains effets résistent pleinement à cette correction.
+En définitive, cette étude ne prétend pas établir des relations causales strictes, mais propose une analyse empirique rigoureuse des associations structurelles entre conditions socio-économiques, systèmes de santé et écarts de longévité entre les sexes. Elle met en lumière l’importance de politiques publiques de santé ciblées et d’une prise en compte différenciée des causes de mortalité selon le genre, afin de réduire durablement ces inégalités.
+
+
