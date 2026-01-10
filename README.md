@@ -22,18 +22,13 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 ## 🗂️Repository Structure
 
 .
+
 ├──  CleanData/             # Cleaned and harmonized datasets
-
 ├──  EDA/                   # Exploratory Data Analysis (figures & notebooks)
-
 ├──  Images/                # Main figures used in the report
-
 ├──  MachineLearning/       # Supervised & unsupervised ML models
-
 ├──  Regression/            # Econometric models and regression outputs
-
 ├──  RapportdeStage.pdf     # Final internship report (PDF)
-
 └──  README.md
 
 
