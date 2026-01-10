@@ -45,7 +45,7 @@ The final comparative analysis focuses on 26 countries, primarily for the year 2
 
 ---
 
-##📊 Methodology
+## 📊 Methodology
 
 ### Exploratory Data Analysis
 
@@ -94,7 +94,7 @@ ___
 - **Libraries**:
  - R: `tidyverse`, `plm`
  - Python: `pandas`, `numpy`, `scikit-learn`, `matplotlib`, `seaborn`
-- **Scientific writing**: LaTeX, Jupyter Notebook
+- **Scientific writing**: LaTeX, Jupyter Notebook, R markdown 
 
 ---
 
