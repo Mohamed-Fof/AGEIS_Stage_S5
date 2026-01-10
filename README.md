@@ -82,7 +82,7 @@ The final comparative analysis focuses on 26 countries, primarily for the year 2
 
 ---
 
-## Key Results
+## 🔑 Key Results
 
 - Women live longer than men in almost all countries, but spend more years in poor health on average.
 - Health-related factors (notably HIV/AIDS and certain cancers) play a major role in explaining gender gaps.
