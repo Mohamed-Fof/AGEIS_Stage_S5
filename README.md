@@ -119,8 +119,8 @@ Internship at AGEIS Research Laboratory
 📅 September 2025 – January 2026
 
 Supervisors:
-- Jacques Demongeot
-- Julien Grepat
+- Jacques Demongeot (internship tutor)
+- Julien Grepat (academic supervisor)
 
 ___
 
