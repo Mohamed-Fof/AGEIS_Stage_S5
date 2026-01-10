@@ -1,7 +1,7 @@
 # Gender Gap in Life Expectancy and Healthy Life Expectancy
 ## Statistical, Econometric and Machine Learning Analysis
 
-## Overview
+## 📌Overview
 
 This repository contains the work conducted during my **Bachelor’s internship (L3 MIASHS, 2025–2026)** at the **AGEIS Research Laboratory (Université Grenoble Alpes)**.
 
@@ -10,7 +10,7 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 
 ---
 
-# Research Objectives
+# 🎯Research Objectives
 
 - Quantify gender gaps in life expectancy and healthy life expectancy
 - Identify health and socio-economic factors associated with these gaps
@@ -19,7 +19,7 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 
 ---
 
-## Repository Structure
+## 🗂️Repository Structure
 
 .
 ├── CleanData/             # Cleaned and harmonized datasets
@@ -31,7 +31,7 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 └── README.md
 
 
-## Data Sources
+##📊 Data Sources
 
 The analysis relies on international indicators from:
 
@@ -45,7 +45,7 @@ The final comparative analysis focuses on 26 countries, primarily for the year 2
 
 ---
 
-## Methodology
+##📊 Methodology
 
 ### Exploratory Data Analysis
 
@@ -80,15 +80,15 @@ The final comparative analysis focuses on 26 countries, primarily for the year 2
 
 ## Key Results
 
--Women live longer than men in almost all countries, but spend more years in poor health on average.
--Health-related factors (notably HIV/AIDS and certain cancers) play a major role in explaining gender gaps.
--After econometric corrections, economic variables show weaker direct effects.
--Simple linear models achieve strong predictive performance while remaining interpretable.
--Clustering highlights structurally distinct country groups according to health and development indicators.
+- Women live longer than men in almost all countries, but spend more years in poor health on average.
+- Health-related factors (notably HIV/AIDS and certain cancers) play a major role in explaining gender gaps.
+- After econometric corrections, economic variables show weaker direct effects.
+- Simple linear models achieve strong predictive performance while remaining interpretable.
+- Clustering highlights structurally distinct country groups according to health and development indicators.
 
 ___
 
-## Tools & Technologies
+## 🧰Tools & Technologies
 
 -**Languages**: R, Python
 -**Libraries**:
@@ -98,7 +98,7 @@ ___
 
 ---
 
-## Author
+## 👤Author
 
 **Mohamed FOFANA**
 Bachelor’s degree in MIASHS – Université Grenoble Alpes
@@ -111,6 +111,6 @@ Supervisors:
 
 ___
 
-## Reference
+## 📄 Reference
 If you use or refer to this work, please cite the internship report available as
 RapportdeStage.pdf in this repository.
