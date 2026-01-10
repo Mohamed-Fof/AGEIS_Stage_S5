@@ -25,23 +25,12 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 
 AGEIS_Stage_S5/
 │
-├── Data/                    # Données brutes et nettoyées
-│
-├── EDA/                     # Analyse exploratoire des données
-│   ├── scripts_R/
-│   └── visualisations/
-│
-├── Econometrics/            # Régressions multiples & données de panel
-│   ├── regression_results/
-│   └── panel_models/
-│
-├── MachineLearning/         # Apprentissage supervisé & clustering
-│   ├── supervised/
-│   ├── clustering/
-│   └── figures/
-│
-├── Report/                  # Rapport de stage (PDF / LaTeX)
-│
+├── CleanData/ # Cleaned and harmonized datasets
+├── EDA/ # Exploratory Data Analysis (figures & notebooks)
+├── Images/ # Main figures used in the report
+├── MachineLearning/ # Supervised & unsupervised ML models
+├── Regression/ # Econometric models and regression outputs
+├── RapportdeStage.pdf # Final internship report (PDF)
 └── README.md
 
 ```
