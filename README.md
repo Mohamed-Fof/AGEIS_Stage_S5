@@ -22,7 +22,6 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 ## 🗂️Repository Structure
 
 .
-
 ├──  CleanData/             # Cleaned and harmonized datasets
 ├──  EDA/                   # Exploratory Data Analysis (figures & notebooks)
 ├──  Images/                # Main figures used in the report
@@ -87,6 +86,14 @@ The final comparative analysis focuses on 26 countries, primarily for the year 2
 - Simple linear models achieve strong predictive performance while remaining interpretable.
 - Clustering highlights structurally distinct country groups according to health and development indicators.
 
+---
+
+## ⚠️Limitations
+
+- The analysis is based on a limited number of countries, which may restrict the generalizability of the results.
+- The study adopts a primarily descriptive and predictive approach; no causal inference methods are applied.
+- Some relevant dimensions (institutional, behavioral, environmental factors) are not explicitly modeled.
+- Data quality and availability vary across countries and indicators, which may affect comparability.
 ___
 
 ## 🧰Tools & Technologies
