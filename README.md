@@ -21,6 +21,8 @@ It combines exploratory data analysis, econometric modeling, and Machine Learnin
 
 ## 🗂️Repository Structure
 
+```bash
+
 AGEIS_Stage_S5/
 │
 ├── Data/                    # Données brutes et nettoyées
@@ -42,7 +44,7 @@ AGEIS_Stage_S5/
 │
 └── README.md
 
-
+```
 
 ## 📊 Data Sources
 
